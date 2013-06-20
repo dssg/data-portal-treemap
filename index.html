@@ -124,10 +124,48 @@
 	/* load in data, display root */
 	d3.json("portaldata.json", function(root) {
 
+	    var replaceAll = function(src, oldr, newr){
+	      while(src.indexOf(oldr) > -1){
+	        src = src.replace(oldr, newr);
+	      }
+	      return src;
+	    };
+	    var getURLvar = function(nm){nm=nm.replace(/[\[]/,"\\\[").replace(/[\]]/,"\\\]");var rxS="[\\?&]"+nm+"=([^&#]*)";var rx=new RegExp(rxS);var rs=rx.exec(window.location.href);if(!rs){return null;}else{return rs[1];}};
+	    var moveSquare = getURLvar("sq");
+	    
+	    var chooseroot = root;
+	    if(moveSquare){
+	      var findMatch = function(node, chain, searchname){
+	        if(typeof node.name != "undefined" && replaceAll(replaceAll(chain.join(".") + "." + name(node)," ",""),"&","") == searchname){
+	          return node;
+	        }
+	        if(typeof node.children != "undefined"){
+	          chain.push( name(node) );
+	          for(var c=0;c<node.children.length;c++){
+	            var makeMatch = findMatch( node.children[c], chain, searchname, node );
+	            if(makeMatch){
+	              node.children[c].parent = node;
+	              return makeMatch;
+	            }
+	          }
+	          chain.pop();
+	        }
+	      };
+	      var wantroot = findMatch(root, [], moveSquare);
+	      if(wantroot){
+	        chooseroot = wantroot;
+	      }
+	    }
+
+		initialize(chooseroot);
+		accumulate(chooseroot);
+		layout(chooseroot);
+		display(chooseroot);
+
 		initialize(root);
 		accumulate(root);
 		layout(root);
-		display(root);
+		//display(root);
 
 		function initialize(root) {
 			root.x = root.y = 0;
@@ -173,6 +211,17 @@
 				.on("click", transition)
 				.select("text")
 				.text(name(d));
+
+			if(typeof history != "undefined" && typeof history.pushState != "undefined"){
+			  // add history to URL
+			  history.pushState(null, null, "?sq=" + replaceAll(replaceAll(name(d)," ",""),"&","") );
+			}
+	        window.onpopstate = function(e) {
+	          // hit back button -> go back to parent
+	          if(d != root){
+	            transition( d.parent );
+	          }
+  	        };
 
 			var g1 = svg.insert("g", ".grandparent")
 				.datum(d)
